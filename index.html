@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>CABINET</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CABINET">
+<meta name="theme-color" content="#0e0d0b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  html, body { margin: 0; padding: 0; background: #0e0d0b; -webkit-tap-highlight-color: transparent; }
+  #root { min-height: 100vh; }
+  body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+const STORAGE_KEY = "art-collection-v1";
+const DB_NAME = "art-cabinet-db";
+const DB_STORE = "collection";
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbLoad() {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readonly");
+      const req = tx.objectStore(DB_STORE).get(STORAGE_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch { return null; }
+}
+
+async function idbSave(data) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).put(data, STORAGE_KEY);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+const FIELDS = {
+  artist: "Художник",
+  title: "Название",
+  year: "Год",
+  location: "Место хранения",
+  medium: "Техника",
+  notes: "Заметки",
+};
+
+const SORT_OPTIONS = [
+  { value: "artist", label: "По художнику" },
+  { value: "year", label: "По году" },
+  { value: "location", label: "По месту хранения" },
+  { value: "title", label: "По названию" },
+];
+
+const EMPTY_WORK = { artist: "", title: "", year: "", location: "", medium: "", notes: "", image: null };
+
+function compressImage(dataUrl, maxW = 2000) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      res(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.src = dataUrl;
+  });
+}
+
+function App() {
+  const [collection, setCollection] = useState([]);
+  const [view, setView] = useState("grid"); // grid | detail | form
+  const [selected, setSelected] = useState(null);
+  const [form, setForm] = useState(EMPTY_WORK);
+  const [editing, setEditing] = useState(false);
+  const [sortBy, setSortBy] = useState("artist");
+  const [sortDir, setSortDir] = useState("asc");
+  const [filterArtist, setFilterArtist] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+  const [search, setSearch] = useState("");
+  const [favOnly, setFavOnly] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
+  const fileRef = useRef();
+  const importRef = useRef();
+
+  const [saveError, setSaveError] = useState("");
+  const [exportText, setExportText] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const data = await idbLoad();
+      if (data && data.length) {
+        setCollection(data);
+        return;
+      }
+      // migrate any old localStorage data
+      try {
+        const old = localStorage.getItem(STORAGE_KEY);
+        if (old) {
+          const parsed = JSON.parse(old);
+          setCollection(parsed);
+          idbSave(parsed).catch(() => {});
+        }
+      } catch {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e) => { if (e.key === "Escape") setLightbox(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
+
+  const save = (data) => {
+    setCollection(data);
+    idbSave(data)
+      .then(() => setSaveError(""))
+      .catch((err) => setSaveError("Не удалось сохранить: " + (err?.message || "ошибка хранилища")));
+  };
+
+  const exportData = () => {
+    const json = JSON.stringify(collection, null, 2);
+    try {
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `art-collection-${new Date().toISOString().slice(0, 10)}.json`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch {
+      // Fallback for sandboxed environments where download is blocked
+      setExportText(json);
+    }
+  };
+
+  const importData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if (Array.isArray(parsed)) {
+          const existingIds = new Set(collection.map(w => w.id));
+          const merged = [...collection, ...parsed.filter(w => !existingIds.has(w.id))];
+          save(merged);
+        }
+      } catch {
+        setSaveError("Не удалось прочитать файл");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const artists = [...new Set(collection.map(w => w.artist).filter(Boolean))].sort();
+  const locations = [...new Set(collection.map(w => w.location).filter(Boolean))].sort();
+
+  const filtered = collection
+    .filter(w =>
+      (!filterArtist || w.artist === filterArtist) &&
+      (!filterLocation || w.location === filterLocation) &&
+      (!favOnly || w.favorite) &&
+      (!search || `${w.artist} ${w.title} ${w.notes}`.toLowerCase().includes(search.toLowerCase()))
+    )
+    .sort((a, b) => {
+      let cmp;
+      if (sortBy === "year") {
+        cmp = (parseInt(a.year) || 0) - (parseInt(b.year) || 0);
+      } else {
+        const av = (a[sortBy] || "").toString().toLowerCase();
+        const bv = (b[sortBy] || "").toString().toLowerCase();
+        cmp = av.localeCompare(bv, "ru");
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+  const openAdd = () => { setForm(EMPTY_WORK); setEditing(false); setView("form"); };
+  const openEdit = (w) => { setForm({ ...w }); setEditing(true); setView("form"); };
+  const openDetail = (w) => { setSelected(w); setView("detail"); };
+
+  const toggleFav = (id, e) => {
+    if (e) e.stopPropagation();
+    save(collection.map(w => w.id === id ? { ...w, favorite: !w.favorite } : w));
+  };
+
+  const handleImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const compressed = await compressImage(ev.target.result);
+      setForm(f => ({ ...f, image: compressed }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = () => {
+    if (!form.title && !form.artist) return;
+    if (editing) {
+      save(collection.map(w => w.id === form.id ? form : w));
+      setSelected(form);
+    } else {
+      const newWork = { ...form, id: Date.now() };
+      save([...collection, newWork]);
+    }
+    setView(editing ? "detail" : "grid");
+  };
+
+  const handleDelete = (id) => {
+    save(collection.filter(w => w.id !== id));
+    setView("grid");
+  };
+
+  return (
+    <div style={styles.root}>
+      <style>{css}</style>
+
+      {/* Header */}
+      <header style={styles.header}>
+        <div style={styles.headerInner}>
+          <div>
+            <div style={styles.logo}>CABINET</div>
+            <div style={styles.tagline}>личная коллекция живописи</div>
+          </div>
+          <div style={styles.headerRight}>
+            <div style={styles.count}>{collection.length} {plural(collection.length, "работа", "работы", "работ")}</div>
+            <button style={styles.ghostBtn} className="ghost-btn" onClick={exportData} title="Сохранить коллекцию в файл">экспорт</button>
+            <button style={styles.ghostBtn} className="ghost-btn" onClick={() => importRef.current.click()} title="Загрузить из файла">импорт</button>
+            <input ref={importRef} type="file" accept="application/json" style={{ display: "none" }} onChange={importData} />
+            {view !== "form" && (
+              <button style={styles.addBtn} onClick={openAdd} className="add-btn">
+                + добавить
+              </button>
+            )}
+          </div>
+        </div>
+        {saveError && <div style={styles.errorBar}>{saveError}</div>}
+      </header>
+
+      {/* Grid view */}
+      {view === "grid" && (
+        <div style={styles.page}>
+          {/* Controls */}
+          <div style={styles.controls}>
+            <input
+              style={styles.search}
+              placeholder="Поиск по художнику, названию, заметкам..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            <div style={styles.filters}>
+              <select style={styles.select} value={filterArtist} onChange={e => setFilterArtist(e.target.value)}>
+                <option value="">Все художники</option>
+                {artists.map(a => <option key={a}>{a}</option>)}
+              </select>
+              <select style={styles.select} value={filterLocation} onChange={e => setFilterLocation(e.target.value)}>
+                <option value="">Все места</option>
+                {locations.map(l => <option key={l}>{l}</option>)}
+              </select>
+              <select style={styles.select} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <button
+                style={{ ...styles.select, cursor: "pointer" }}
+                onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                title={sortDir === "asc" ? "По возрастанию" : "По убыванию"}
+              >{sortDir === "asc" ? "↑" : "↓"}</button>
+              <button
+                style={{ ...styles.select, ...(favOnly ? styles.favToggleActive : {}), cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                onClick={() => setFavOnly(v => !v)}
+              >
+                <span>{favOnly ? "♥" : "♡"}</span> Любимые
+              </button>
+            </div>
+          </div>
+
+          {/* Grid */}
+          {filtered.length === 0 ? (
+            <div style={styles.empty}>
+              {collection.length === 0
+                ? <>Коллекция пуста.<br />Добавьте первую работу.</>
+                : "Ничего не найдено."}
+            </div>
+          ) : (
+            <div style={styles.grid}>
+              {filtered.map(w => (
+                <div key={w.id} style={styles.card} className="card" onClick={() => openDetail(w)}>
+                  <div style={styles.cardImg}>
+                    <button
+                      style={{ ...styles.heart, ...(w.favorite ? styles.heartActive : {}) }}
+                      className="heart"
+                      onClick={(e) => toggleFav(w.id, e)}
+                      title="В любимые"
+                    >{w.favorite ? "♥" : "♡"}</button>
+                    {w.image
+                      ? <img src={w.image} alt={w.title} style={styles.img} />
+                      : <div style={styles.noImg}><span style={styles.noImgIcon}>🖼</span></div>
+                    }
+                  </div>
+                  <div style={styles.cardBody}>
+                    <div style={styles.cardArtist}>{w.artist || "—"}</div>
+                    <div style={styles.cardTitle}>{w.title || "Без названия"}</div>
+                    <div style={styles.cardMeta}>
+                      {w.year && <span>{w.year}</span>}
+                      {w.year && w.location && <span style={styles.dot}>·</span>}
+                      {w.location && <span>{w.location}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Detail view */}
+      {view === "detail" && selected && (() => {
+        const w = collection.find(x => x.id === selected.id) || selected;
+        return (
+          <div style={styles.page}>
+            <button style={styles.back} onClick={() => setView("grid")} className="back-btn">← назад</button>
+            <div style={styles.detail}>
+              <div style={styles.detailImg}>
+                {w.image
+                  ? <img src={w.image} alt={w.title} style={{ ...styles.detailImgEl, cursor: "zoom-in" }} onClick={() => setLightbox(w.image)} />
+                  : <div style={{ ...styles.noImg, height: 300, borderRadius: 4 }}><span style={{ fontSize: 48 }}>🖼</span></div>
+                }
+              </div>
+              <div style={styles.detailInfo}>
+                <div style={styles.detailArtist}>{w.artist || "Художник не указан"}</div>
+                <div style={styles.detailTitle}>
+                  {w.title || "Без названия"}
+                  <span
+                    style={{ ...styles.detailHeart, ...(w.favorite ? styles.heartActive : {}) }}
+                    className="heart"
+                    onClick={() => toggleFav(w.id)}
+                    title="В любимые"
+                  >{w.favorite ? "♥" : "♡"}</span>
+                </div>
+                <div style={styles.detailMeta}>
+                  {w.year && <div style={styles.metaRow}><span style={styles.metaLabel}>Год</span><span>{w.year}</span></div>}
+                  {w.medium && <div style={styles.metaRow}><span style={styles.metaLabel}>Техника</span><span>{w.medium}</span></div>}
+                  {w.location && <div style={styles.metaRow}><span style={styles.metaLabel}>Место хранения</span><span>{w.location}</span></div>}
+                  {w.notes && (
+                    <div style={styles.metaRow}>
+                      <span style={styles.metaLabel}>Заметки</span>
+                      <span style={styles.notes}>{w.notes}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={styles.detailActions}>
+                  <button style={styles.editBtn} className="edit-btn" onClick={() => openEdit(w)}>Редактировать</button>
+                  <button style={styles.delBtn} className="del-btn" onClick={() => handleDelete(w.id)}>Удалить</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Form view */}
+      {view === "form" && (
+        <div style={styles.page}>
+          <button style={styles.back} onClick={() => setView(editing ? "detail" : "grid")} className="back-btn">← назад</button>
+          <div style={styles.formWrap}>
+            <h2 style={styles.formTitle}>{editing ? "Редактировать работу" : "Добавить работу"}</h2>
+
+            {/* Image upload */}
+            <div style={styles.uploadArea} onClick={() => fileRef.current.click()} className="upload-area">
+              {form.image
+                ? <img src={form.image} alt="" style={{ maxHeight: 220, maxWidth: "100%", borderRadius: 4 }} />
+                : <div style={styles.uploadPlaceholder}>
+                    <span style={{ fontSize: 32 }}>🖼</span>
+                    <span style={{ marginTop: 8, fontSize: 13, color: "#888" }}>Нажмите для загрузки изображения</span>
+                  </div>
+              }
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImage} />
+            </div>
+
+            {Object.entries(FIELDS).map(([key, label]) => (
+              <div key={key} style={styles.field}>
+                <label style={styles.label}>{label}</label>
+                {key === "notes"
+                  ? <textarea
+                      style={{ ...styles.input, height: 90, resize: "vertical" }}
+                      value={form[key]}
+                      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                      placeholder={label}
+                    />
+                  : <>
+                      <input
+                        style={styles.input}
+                        value={form[key]}
+                        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                        placeholder={label}
+                        type={key === "year" ? "number" : "text"}
+                        list={key === "artist" ? "artist-list" : key === "location" ? "location-list" : undefined}
+                      />
+                      {key === "artist" && (
+                        <datalist id="artist-list">
+                          {artists.map(a => <option key={a} value={a} />)}
+                        </datalist>
+                      )}
+                      {key === "location" && (
+                        <datalist id="location-list">
+                          {locations.map(l => <option key={l} value={l} />)}
+                        </datalist>
+                      )}
+                    </>
+                }
+              </div>
+            ))}
+
+            <div style={styles.formActions}>
+              <button style={styles.saveBtn} className="save-btn" onClick={handleSubmit}>
+                {editing ? "Сохранить" : "Добавить в коллекцию"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export fallback modal */}
+      {exportText !== null && (
+        <div style={styles.lightbox} onClick={() => setExportText(null)}>
+          <div style={styles.exportModal} onClick={e => e.stopPropagation()}>
+            <div style={styles.exportTitle}>Экспорт коллекции</div>
+            <div style={styles.exportHint}>Скачивание заблокировано средой. Выделите текст и скопируйте его в файл с расширением .json</div>
+            <textarea style={styles.exportArea} readOnly value={exportText} onFocus={e => e.target.select()} />
+            <div style={styles.exportActions}>
+              <button style={styles.editBtn} className="edit-btn" onClick={async () => {
+                try { await navigator.clipboard.writeText(exportText); setSaveError(""); } catch {}
+              }}>Копировать</button>
+              <button style={styles.delBtn} className="del-btn" onClick={() => setExportText(null)}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div style={styles.lightbox} onClick={() => setLightbox(null)}>
+          <button style={styles.lightboxClose} onClick={() => setLightbox(null)} className="back-btn">✕</button>
+          <img src={lightbox} alt="" style={styles.lightboxImg} onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function plural(n, one, few, many) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} ${one}`;
+  if ([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
+const styles = {
+  root: { minHeight: "100vh", background: "#0e0d0b", color: "#e8e2d8", fontFamily: "'Mulish', 'Segoe UI', sans-serif" },
+  header: { borderBottom: "1px solid #2a2720", padding: "20px 0", position: "sticky", top: 0, background: "#0e0d0b", zIndex: 10 },
+  headerInner: { maxWidth: 1100, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
+  logo: { fontSize: 22, letterSpacing: "0.25em", fontFamily: "'Mulish', 'Segoe UI', sans-serif", color: "#c9a84c", fontWeight: "normal" },
+  tagline: { fontSize: 11, color: "#666", letterSpacing: "0.15em", textTransform: "uppercase", marginTop: 2 },
+  headerRight: { display: "flex", alignItems: "center", gap: 20 },
+  count: { fontSize: 13, color: "#888" },
+  addBtn: { background: "#c9a84c", color: "#0e0d0b", border: "none", padding: "9px 20px", fontSize: 13, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif" },
+  ghostBtn: { background: "none", border: "1px solid #2e2b24", color: "#999", padding: "8px 14px", fontSize: 12, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif", borderRadius: 2 },
+  errorBar: { maxWidth: 1100, margin: "12px auto 0", padding: "8px 24px", color: "#d4546a", fontSize: 13 },
+  page: { maxWidth: 1100, margin: "0 auto", padding: "32px 24px" },
+  controls: { marginBottom: 28, display: "flex", flexDirection: "column", gap: 12 },
+  search: { background: "#1a1915", border: "1px solid #2e2b24", color: "#e8e2d8", padding: "10px 14px", fontSize: 14, fontFamily: "inherit", outline: "none", borderRadius: 2, width: "100%", boxSizing: "border-box" },
+  filters: { display: "flex", gap: 10, flexWrap: "wrap" },
+  select: { background: "#1a1915", border: "1px solid #2e2b24", color: "#e8e2d8", padding: "8px 12px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none", borderRadius: 2 },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 20 },
+  card: { background: "#141310", border: "1px solid #221f19", cursor: "pointer", transition: "border-color 0.2s" },
+  cardImg: { width: "100%", paddingTop: "75%", overflow: "hidden", background: "#1a1915", position: "relative" },
+  img: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", display: "block" },
+  noImg: { position: "absolute", inset: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#1a1915" },
+  noImgIcon: { fontSize: 36, opacity: 0.3 },
+  cardBody: { padding: "14px 16px" },
+  cardArtist: { fontSize: 11, color: "#c9a84c", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 },
+  cardTitle: { fontSize: 15, color: "#e8e2d8", marginBottom: 6, lineHeight: 1.3 },
+  cardMeta: { fontSize: 12, color: "#666" },
+  dot: { margin: "0 5px" },
+  empty: { textAlign: "center", color: "#555", padding: "80px 0", lineHeight: 2, fontSize: 15 },
+  back: { background: "none", border: "none", color: "#c9a84c", cursor: "pointer", fontSize: 13, letterSpacing: "0.08em", padding: 0, marginBottom: 28, fontFamily: "inherit" },
+  detail: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "start" },
+  detailImg: { position: "sticky", top: 100 },
+  detailImgEl: { width: "100%", display: "block", borderRadius: 2 },
+  detailInfo: {},
+  detailArtist: { fontSize: 12, color: "#c9a84c", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 10 },
+  detailTitle: { fontSize: 28, lineHeight: 1.25, marginBottom: 28, fontWeight: "normal" },
+  detailMeta: { borderTop: "1px solid #2a2720", paddingTop: 20, display: "flex", flexDirection: "column", gap: 14 },
+  metaRow: { display: "flex", gap: 16 },
+  metaLabel: { color: "#666", fontSize: 12, letterSpacing: "0.08em", minWidth: 120, paddingTop: 1 },
+  notes: { fontSize: 14, lineHeight: 1.7, color: "#b0a898" },
+  detailActions: { marginTop: 36, display: "flex", gap: 12 },
+  heart: { position: "absolute", top: 10, right: 10, width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(14,13,11,0.6)", color: "#e8e2d8", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", lineHeight: 1, transition: "all 0.2s", zIndex: 2 },
+  heartActive: { color: "#d4546a" },
+  detailHeart: { cursor: "pointer", marginLeft: 14, fontSize: 24, color: "#666", verticalAlign: "middle" },
+  favToggleActive: { borderColor: "#d4546a", color: "#d4546a" },
+  lightbox: { position: "fixed", inset: 0, background: "rgba(8,7,6,0.95)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 40, cursor: "zoom-out", backdropFilter: "blur(8px)" },
+  lightboxImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain", cursor: "default", boxShadow: "0 20px 80px rgba(0,0,0,0.6)" },
+  lightboxClose: { position: "fixed", top: 24, right: 28, background: "none", border: "none", color: "#e8e2d8", fontSize: 26, cursor: "pointer", zIndex: 101, fontFamily: "inherit" },
+  exportModal: { background: "#141310", border: "1px solid #2e2b24", borderRadius: 4, padding: 28, maxWidth: 560, width: "90%", cursor: "default" },
+  exportTitle: { fontSize: 18, color: "#c9a84c", marginBottom: 8, letterSpacing: "0.08em" },
+  exportHint: { fontSize: 13, color: "#888", marginBottom: 16, lineHeight: 1.5 },
+  exportArea: { width: "100%", height: 220, background: "#0e0d0b", border: "1px solid #2e2b24", color: "#b0a898", padding: 12, fontSize: 12, fontFamily: "monospace", borderRadius: 2, boxSizing: "border-box", resize: "vertical" },
+  exportActions: { display: "flex", gap: 12, marginTop: 16 },
+  editBtn: { background: "none", border: "1px solid #c9a84c", color: "#c9a84c", padding: "9px 22px", fontSize: 13, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.08em" },
+  delBtn: { background: "none", border: "1px solid #443330", color: "#886655", padding: "9px 22px", fontSize: 13, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.08em" },
+  formWrap: { maxWidth: 560, margin: "0 auto" },
+  formTitle: { fontSize: 20, fontWeight: "normal", marginBottom: 28, color: "#c9a84c", letterSpacing: "0.1em" },
+  uploadArea: { border: "1px dashed #3a3628", background: "#141310", padding: 20, marginBottom: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120, borderRadius: 2 },
+  uploadPlaceholder: { display: "flex", flexDirection: "column", alignItems: "center", color: "#555" },
+  field: { marginBottom: 18 },
+  label: { display: "block", fontSize: 11, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 },
+  input: { width: "100%", background: "#1a1915", border: "1px solid #2e2b24", color: "#e8e2d8", padding: "10px 12px", fontSize: 14, fontFamily: "'Mulish', 'Segoe UI', sans-serif", outline: "none", borderRadius: 2, boxSizing: "border-box" },
+  formActions: { marginTop: 28 },
+  saveBtn: { background: "#c9a84c", color: "#0e0d0b", border: "none", padding: "12px 28px", fontSize: 14, cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif", letterSpacing: "0.1em", width: "100%" },
+};
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600&display=swap');
+  .card:hover { border-color: #c9a84c !important; }
+  .heart:hover { color: #d4546a !important; background: rgba(14,13,11,0.85) !important; }
+  .add-btn:hover { background: #d4b45a !important; }
+  .ghost-btn:hover { border-color: #c9a84c !important; color: #c9a84c !important; }
+  .back-btn:hover { opacity: 0.7; }
+  .edit-btn:hover { background: rgba(201,168,76,0.08) !important; }
+  .del-btn:hover { background: rgba(136,85,64,0.1) !important; }
+  .save-btn:hover { background: #d4b45a !important; }
+  .upload-area:hover { border-color: #c9a84c !important; }
+  input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
+  * { box-sizing: border-box; }
+  @media (max-width: 640px) {
+    .detail-grid { grid-template-columns: 1fr !important; }
+  }
+`;
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
