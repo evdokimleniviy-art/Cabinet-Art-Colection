@@ -260,8 +260,10 @@ function App() {
           </div>
           <div style={styles.headerRight}>
             <div style={styles.count}>{collection.length} {plural(collection.length, "работа", "работы", "работ")}</div>
-            <button style={styles.ghostBtn} className="ghost-btn" onClick={exportData} title="Сохранить коллекцию в файл">экспорт</button>
-            <button style={styles.ghostBtn} className="ghost-btn" onClick={() => importRef.current.click()} title="Загрузить из файла">импорт</button>
+            <div style={styles.ioStack}>
+              <button style={styles.ghostBtn} className="ghost-btn" onClick={exportData} title="Сохранить коллекцию в файл">экспорт</button>
+              <button style={styles.ghostBtn} className="ghost-btn" onClick={() => importRef.current.click()} title="Загрузить из файла">импорт</button>
+            </div>
             <input ref={importRef} type="file" accept="application/json" style={{ display: "none" }} onChange={importData} />
             {view !== "form" && (
               <button style={styles.addBtn} onClick={openAdd} className="add-btn">
@@ -498,9 +500,10 @@ const styles = {
   logo: { fontSize: 22, letterSpacing: "0.25em", fontFamily: "'Mulish', 'Segoe UI', sans-serif", color: "#c9a84c", fontWeight: "normal" },
   tagline: { fontSize: 11, color: "#666", letterSpacing: "0.15em", textTransform: "uppercase", marginTop: 2 },
   headerRight: { display: "flex", alignItems: "center", gap: 20 },
+  ioStack: { display: "flex", flexDirection: "column", gap: 6 },
   count: { fontSize: 13, color: "#888" },
   addBtn: { background: "#c9a84c", color: "#0e0d0b", border: "none", padding: "9px 20px", fontSize: 13, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif" },
-  ghostBtn: { background: "none", border: "1px solid #2e2b24", color: "#999", padding: "8px 14px", fontSize: 12, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif", borderRadius: 2 },
+  ghostBtn: { background: "none", border: "1px solid #2e2b24", color: "#999", padding: "8px 14px", fontSize: 12, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif", borderRadius: 2, textAlign: "center" },
   errorBar: { maxWidth: 1100, margin: "12px auto 0", padding: "8px 24px", color: "#d4546a", fontSize: 13 },
   page: { maxWidth: 1100, margin: "0 auto", padding: "32px 24px" },
   controls: { marginBottom: 28, display: "flex", flexDirection: "column", gap: 12 },
