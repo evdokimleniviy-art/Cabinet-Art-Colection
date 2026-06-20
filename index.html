@@ -17,17 +17,14 @@
 </style>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
+<script>
 const { useState, useEffect, useRef } = React;
-
 const STORAGE_KEY = "art-collection-v1";
 const DB_NAME = "art-cabinet-db";
 const DB_STORE = "collection";
-
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
@@ -39,7 +36,6 @@ function openDB() {
     req.onerror = () => reject(req.error);
   });
 }
-
 async function idbLoad() {
   try {
     const db = await openDB();
@@ -49,9 +45,10 @@ async function idbLoad() {
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => reject(req.error);
     });
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
-
 async function idbSave(data) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -61,26 +58,22 @@ async function idbSave(data) {
     tx.onerror = () => reject(tx.error);
   });
 }
-
 const FIELDS = {
-  artist: "Художник",
-  title: "Название",
-  year: "Год",
-  location: "Место хранения",
-  medium: "Техника",
-  notes: "Заметки",
+  artist: "\u0425\u0443\u0434\u043E\u0436\u043D\u0438\u043A",
+  title: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435",
+  year: "\u0413\u043E\u0434",
+  location: "\u041C\u0435\u0441\u0442\u043E \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F",
+  medium: "\u0422\u0435\u0445\u043D\u0438\u043A\u0430",
+  notes: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438"
 };
-
 const SORT_OPTIONS = [
-  { value: "artist", label: "По художнику" },
-  { value: "year", label: "По году" },
-  { value: "location", label: "По месту хранения" },
-  { value: "title", label: "По названию" },
+  { value: "artist", label: "\u041F\u043E \u0445\u0443\u0434\u043E\u0436\u043D\u0438\u043A\u0443" },
+  { value: "year", label: "\u041F\u043E \u0433\u043E\u0434\u0443" },
+  { value: "location", label: "\u041F\u043E \u043C\u0435\u0441\u0442\u0443 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F" },
+  { value: "title", label: "\u041F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E" }
 ];
-
 const EMPTY_WORK = { artist: "", title: "", year: "", location: "", medium: "", notes: "", image: null };
-
-function compressImage(dataUrl, maxW = 2000) {
+function compressImage(dataUrl, maxW = 2e3) {
   return new Promise((res) => {
     const img = new Image();
     img.onload = () => {
@@ -94,10 +87,9 @@ function compressImage(dataUrl, maxW = 2000) {
     img.src = dataUrl;
   });
 }
-
 function App() {
   const [collection, setCollection] = useState([]);
-  const [view, setView] = useState("grid"); // grid | detail | form
+  const [view, setView] = useState("grid");
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(EMPTY_WORK);
   const [editing, setEditing] = useState(false);
@@ -110,10 +102,8 @@ function App() {
   const [lightbox, setLightbox] = useState(null);
   const fileRef = useRef();
   const importRef = useRef();
-
   const [saveError, setSaveError] = useState("");
   const [exportText, setExportText] = useState(null);
-
   useEffect(() => {
     (async () => {
       const data = await idbLoad();
@@ -121,32 +111,30 @@ function App() {
         setCollection(data);
         return;
       }
-      // migrate any old localStorage data
       try {
         const old = localStorage.getItem(STORAGE_KEY);
         if (old) {
           const parsed = JSON.parse(old);
           setCollection(parsed);
-          idbSave(parsed).catch(() => {});
+          idbSave(parsed).catch(() => {
+          });
         }
-      } catch {}
+      } catch {
+      }
     })();
   }, []);
-
   useEffect(() => {
     if (!lightbox) return;
-    const onKey = (e) => { if (e.key === "Escape") setLightbox(null); };
+    const onKey = (e) => {
+      if (e.key === "Escape") setLightbox(null);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [lightbox]);
-
   const save = (data) => {
     setCollection(data);
-    idbSave(data)
-      .then(() => setSaveError(""))
-      .catch((err) => setSaveError("Не удалось сохранить: " + (err?.message || "ошибка хранилища")));
+    idbSave(data).then(() => setSaveError("")).catch((err) => setSaveError("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C: " + (err?.message || "\u043E\u0448\u0438\u0431\u043A\u0430 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430")));
   };
-
   const exportData = () => {
     const json = JSON.stringify(collection, null, 2);
     try {
@@ -154,7 +142,7 @@ function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `art-collection-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `art-collection-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
       a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
@@ -163,11 +151,9 @@ function App() {
         URL.revokeObjectURL(url);
       }, 100);
     } catch {
-      // Fallback for sandboxed environments where download is blocked
       setExportText(json);
     }
   };
-
   const importData = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -176,64 +162,64 @@ function App() {
       try {
         const parsed = JSON.parse(ev.target.result);
         if (Array.isArray(parsed)) {
-          const existingIds = new Set(collection.map(w => w.id));
-          const merged = [...collection, ...parsed.filter(w => !existingIds.has(w.id))];
+          const existingIds = new Set(collection.map((w) => w.id));
+          const merged = [...collection, ...parsed.filter((w) => !existingIds.has(w.id))];
           save(merged);
         }
       } catch {
-        setSaveError("Не удалось прочитать файл");
+        setSaveError("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0444\u0430\u0439\u043B");
       }
     };
     reader.readAsText(file);
     e.target.value = "";
   };
-
-  const artists = [...new Set(collection.map(w => w.artist).filter(Boolean))].sort();
-  const locations = [...new Set(collection.map(w => w.location).filter(Boolean))].sort();
-
-  const filtered = collection
-    .filter(w =>
-      (!filterArtist || w.artist === filterArtist) &&
-      (!filterLocation || w.location === filterLocation) &&
-      (!favOnly || w.favorite) &&
-      (!search || `${w.artist} ${w.title} ${w.notes}`.toLowerCase().includes(search.toLowerCase()))
-    )
-    .sort((a, b) => {
-      let cmp;
-      if (sortBy === "year") {
-        cmp = (parseInt(a.year) || 0) - (parseInt(b.year) || 0);
-      } else {
-        const av = (a[sortBy] || "").toString().toLowerCase();
-        const bv = (b[sortBy] || "").toString().toLowerCase();
-        cmp = av.localeCompare(bv, "ru");
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-
-  const openAdd = () => { setForm(EMPTY_WORK); setEditing(false); setView("form"); };
-  const openEdit = (w) => { setForm({ ...w }); setEditing(true); setView("form"); };
-  const openDetail = (w) => { setSelected(w); setView("detail"); };
-
+  const artists = [...new Set(collection.map((w) => w.artist).filter(Boolean))].sort();
+  const locations = [...new Set(collection.map((w) => w.location).filter(Boolean))].sort();
+  const filtered = collection.filter(
+    (w) => (!filterArtist || w.artist === filterArtist) && (!filterLocation || w.location === filterLocation) && (!favOnly || w.favorite) && (!search || `${w.artist} ${w.title} ${w.notes}`.toLowerCase().includes(search.toLowerCase()))
+  ).sort((a, b) => {
+    let cmp;
+    if (sortBy === "year") {
+      cmp = (parseInt(a.year) || 0) - (parseInt(b.year) || 0);
+    } else {
+      const av = (a[sortBy] || "").toString().toLowerCase();
+      const bv = (b[sortBy] || "").toString().toLowerCase();
+      cmp = av.localeCompare(bv, "ru");
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+  const openAdd = () => {
+    setForm(EMPTY_WORK);
+    setEditing(false);
+    setView("form");
+  };
+  const openEdit = (w) => {
+    setForm({ ...w });
+    setEditing(true);
+    setView("form");
+  };
+  const openDetail = (w) => {
+    setSelected(w);
+    setView("detail");
+  };
   const toggleFav = (id, e) => {
     if (e) e.stopPropagation();
-    save(collection.map(w => w.id === id ? { ...w, favorite: !w.favorite } : w));
+    save(collection.map((w) => w.id === id ? { ...w, favorite: !w.favorite } : w));
   };
-
   const handleImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const compressed = await compressImage(ev.target.result);
-      setForm(f => ({ ...f, image: compressed }));
+      setForm((f) => ({ ...f, image: compressed }));
     };
     reader.readAsDataURL(file);
   };
-
   const handleSubmit = () => {
     if (!form.title && !form.artist) return;
     if (editing) {
-      save(collection.map(w => w.id === form.id ? form : w));
+      save(collection.map((w) => w.id === form.id ? form : w));
       setSelected(form);
     } else {
       const newWork = { ...form, id: Date.now() };
@@ -241,258 +227,87 @@ function App() {
     }
     setView(editing ? "detail" : "grid");
   };
-
   const handleDelete = (id) => {
-    save(collection.filter(w => w.id !== id));
+    save(collection.filter((w) => w.id !== id));
     setView("grid");
   };
-
-  return (
-    <div style={styles.root}>
-      <style>{css}</style>
-
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <div>
-            <div style={styles.logo}>CABINET</div>
-            <div style={styles.tagline}>личная коллекция живописи</div>
-          </div>
-          <div style={styles.headerRight}>
-            <div style={styles.count}>{collection.length} {plural(collection.length, "работа", "работы", "работ")}</div>
-            <div style={styles.ioStack}>
-              <button style={styles.ghostBtn} className="ghost-btn" onClick={exportData} title="Сохранить коллекцию в файл">экспорт</button>
-              <button style={styles.ghostBtn} className="ghost-btn" onClick={() => importRef.current.click()} title="Загрузить из файла">импорт</button>
-            </div>
-            <input ref={importRef} type="file" accept="application/json" style={{ display: "none" }} onChange={importData} />
-            {view !== "form" && (
-              <button style={styles.addBtn} onClick={openAdd} className="add-btn">
-                + добавить
-              </button>
-            )}
-          </div>
-        </div>
-        {saveError && <div style={styles.errorBar}>{saveError}</div>}
-      </header>
-
-      {/* Grid view */}
-      {view === "grid" && (
-        <div style={styles.page}>
-          {/* Controls */}
-          <div style={styles.controls}>
-            <input
-              style={styles.search}
-              placeholder="Поиск по художнику, названию, заметкам..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <div style={styles.filters}>
-              <select style={styles.select} value={filterArtist} onChange={e => setFilterArtist(e.target.value)}>
-                <option value="">Все художники</option>
-                {artists.map(a => <option key={a}>{a}</option>)}
-              </select>
-              <select style={styles.select} value={filterLocation} onChange={e => setFilterLocation(e.target.value)}>
-                <option value="">Все места</option>
-                {locations.map(l => <option key={l}>{l}</option>)}
-              </select>
-              <select style={styles.select} value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <button
-                style={{ ...styles.select, cursor: "pointer" }}
-                onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
-                title={sortDir === "asc" ? "По возрастанию" : "По убыванию"}
-              >{sortDir === "asc" ? "↑" : "↓"}</button>
-              <button
-                style={{ ...styles.select, ...(favOnly ? styles.favToggleActive : {}), cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                onClick={() => setFavOnly(v => !v)}
-              >
-                <span>{favOnly ? "♥" : "♡"}</span> Любимые
-              </button>
-            </div>
-          </div>
-
-          {/* Grid */}
-          {filtered.length === 0 ? (
-            <div style={styles.empty}>
-              {collection.length === 0
-                ? <>Коллекция пуста.<br />Добавьте первую работу.</>
-                : "Ничего не найдено."}
-            </div>
-          ) : (
-            <div style={styles.grid}>
-              {filtered.map(w => (
-                <div key={w.id} style={styles.card} className="card" onClick={() => openDetail(w)}>
-                  <div style={styles.cardImg}>
-                    <button
-                      style={{ ...styles.heart, ...(w.favorite ? styles.heartActive : {}) }}
-                      className="heart"
-                      onClick={(e) => toggleFav(w.id, e)}
-                      title="В любимые"
-                    >{w.favorite ? "♥" : "♡"}</button>
-                    {w.image
-                      ? <img src={w.image} alt={w.title} style={styles.img} />
-                      : <div style={styles.noImg}><span style={styles.noImgIcon}>🖼</span></div>
-                    }
-                  </div>
-                  <div style={styles.cardBody}>
-                    <div style={styles.cardArtist}>{w.artist || "—"}</div>
-                    <div style={styles.cardTitle}>{w.title || "Без названия"}</div>
-                    <div style={styles.cardMeta}>
-                      {w.year && <span>{w.year}</span>}
-                      {w.year && w.location && <span style={styles.dot}>·</span>}
-                      {w.location && <span>{w.location}</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Detail view */}
-      {view === "detail" && selected && (() => {
-        const w = collection.find(x => x.id === selected.id) || selected;
-        return (
-          <div style={styles.page}>
-            <button style={styles.back} onClick={() => setView("grid")} className="back-btn">← назад</button>
-            <div style={styles.detail}>
-              <div style={styles.detailImg}>
-                {w.image
-                  ? <img src={w.image} alt={w.title} style={{ ...styles.detailImgEl, cursor: "zoom-in" }} onClick={() => setLightbox(w.image)} />
-                  : <div style={{ ...styles.noImg, height: 300, borderRadius: 4 }}><span style={{ fontSize: 48 }}>🖼</span></div>
-                }
-              </div>
-              <div style={styles.detailInfo}>
-                <div style={styles.detailArtist}>{w.artist || "Художник не указан"}</div>
-                <div style={styles.detailTitle}>
-                  {w.title || "Без названия"}
-                  <span
-                    style={{ ...styles.detailHeart, ...(w.favorite ? styles.heartActive : {}) }}
-                    className="heart"
-                    onClick={() => toggleFav(w.id)}
-                    title="В любимые"
-                  >{w.favorite ? "♥" : "♡"}</span>
-                </div>
-                <div style={styles.detailMeta}>
-                  {w.year && <div style={styles.metaRow}><span style={styles.metaLabel}>Год</span><span>{w.year}</span></div>}
-                  {w.medium && <div style={styles.metaRow}><span style={styles.metaLabel}>Техника</span><span>{w.medium}</span></div>}
-                  {w.location && <div style={styles.metaRow}><span style={styles.metaLabel}>Место хранения</span><span>{w.location}</span></div>}
-                  {w.notes && (
-                    <div style={styles.metaRow}>
-                      <span style={styles.metaLabel}>Заметки</span>
-                      <span style={styles.notes}>{w.notes}</span>
-                    </div>
-                  )}
-                </div>
-                <div style={styles.detailActions}>
-                  <button style={styles.editBtn} className="edit-btn" onClick={() => openEdit(w)}>Редактировать</button>
-                  <button style={styles.delBtn} className="del-btn" onClick={() => handleDelete(w.id)}>Удалить</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Form view */}
-      {view === "form" && (
-        <div style={styles.page}>
-          <button style={styles.back} onClick={() => setView(editing ? "detail" : "grid")} className="back-btn">← назад</button>
-          <div style={styles.formWrap}>
-            <h2 style={styles.formTitle}>{editing ? "Редактировать работу" : "Добавить работу"}</h2>
-
-            {/* Image upload */}
-            <div style={styles.uploadArea} onClick={() => fileRef.current.click()} className="upload-area">
-              {form.image
-                ? <img src={form.image} alt="" style={{ maxHeight: 220, maxWidth: "100%", borderRadius: 4 }} />
-                : <div style={styles.uploadPlaceholder}>
-                    <span style={{ fontSize: 32 }}>🖼</span>
-                    <span style={{ marginTop: 8, fontSize: 13, color: "#888" }}>Нажмите для загрузки изображения</span>
-                  </div>
-              }
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImage} />
-            </div>
-
-            {Object.entries(FIELDS).map(([key, label]) => (
-              <div key={key} style={styles.field}>
-                <label style={styles.label}>{label}</label>
-                {key === "notes"
-                  ? <textarea
-                      style={{ ...styles.input, height: 90, resize: "vertical" }}
-                      value={form[key]}
-                      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                      placeholder={label}
-                    />
-                  : <>
-                      <input
-                        style={styles.input}
-                        value={form[key]}
-                        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                        placeholder={label}
-                        type={key === "year" ? "number" : "text"}
-                        list={key === "artist" ? "artist-list" : key === "location" ? "location-list" : undefined}
-                      />
-                      {key === "artist" && (
-                        <datalist id="artist-list">
-                          {artists.map(a => <option key={a} value={a} />)}
-                        </datalist>
-                      )}
-                      {key === "location" && (
-                        <datalist id="location-list">
-                          {locations.map(l => <option key={l} value={l} />)}
-                        </datalist>
-                      )}
-                    </>
-                }
-              </div>
-            ))}
-
-            <div style={styles.formActions}>
-              <button style={styles.saveBtn} className="save-btn" onClick={handleSubmit}>
-                {editing ? "Сохранить" : "Добавить в коллекцию"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Export fallback modal */}
-      {exportText !== null && (
-        <div style={styles.lightbox} onClick={() => setExportText(null)}>
-          <div style={styles.exportModal} onClick={e => e.stopPropagation()}>
-            <div style={styles.exportTitle}>Экспорт коллекции</div>
-            <div style={styles.exportHint}>Скачивание заблокировано средой. Выделите текст и скопируйте его в файл с расширением .json</div>
-            <textarea style={styles.exportArea} readOnly value={exportText} onFocus={e => e.target.select()} />
-            <div style={styles.exportActions}>
-              <button style={styles.editBtn} className="edit-btn" onClick={async () => {
-                try { await navigator.clipboard.writeText(exportText); setSaveError(""); } catch {}
-              }}>Копировать</button>
-              <button style={styles.delBtn} className="del-btn" onClick={() => setExportText(null)}>Закрыть</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lightbox */}
-      {lightbox && (
-        <div style={styles.lightbox} onClick={() => setLightbox(null)}>
-          <button style={styles.lightboxClose} onClick={() => setLightbox(null)} className="back-btn">✕</button>
-          <img src={lightbox} alt="" style={styles.lightboxImg} onClick={e => e.stopPropagation()} />
-        </div>
-      )}
-    </div>
-  );
+  return /* @__PURE__ */ React.createElement("div", { style: styles.root }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("header", { style: styles.header }, /* @__PURE__ */ React.createElement("div", { style: styles.headerInner }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.logo }, "CABINET"), /* @__PURE__ */ React.createElement("div", { style: styles.tagline }, "\u043B\u0438\u0447\u043D\u0430\u044F \u043A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u044F \u0436\u0438\u0432\u043E\u043F\u0438\u0441\u0438")), /* @__PURE__ */ React.createElement("div", { style: styles.headerRight }, /* @__PURE__ */ React.createElement("div", { style: styles.count }, collection.length, " ", plural(collection.length, "\u0440\u0430\u0431\u043E\u0442\u0430", "\u0440\u0430\u0431\u043E\u0442\u044B", "\u0440\u0430\u0431\u043E\u0442")), /* @__PURE__ */ React.createElement("div", { style: styles.ioStack }, /* @__PURE__ */ React.createElement("button", { style: styles.ghostBtn, className: "ghost-btn", onClick: exportData, title: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u044E \u0432 \u0444\u0430\u0439\u043B" }, "\u044D\u043A\u0441\u043F\u043E\u0440\u0442"), /* @__PURE__ */ React.createElement("button", { style: styles.ghostBtn, className: "ghost-btn", onClick: () => importRef.current.click(), title: "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u0437 \u0444\u0430\u0439\u043B\u0430" }, "\u0438\u043C\u043F\u043E\u0440\u0442")), /* @__PURE__ */ React.createElement("input", { ref: importRef, type: "file", accept: "application/json", style: { display: "none" }, onChange: importData }), view !== "form" && /* @__PURE__ */ React.createElement("button", { style: styles.addBtn, onClick: openAdd, className: "add-btn" }, "+ \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C"))), saveError && /* @__PURE__ */ React.createElement("div", { style: styles.errorBar }, saveError)), view === "grid" && /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.controls }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      style: styles.search,
+      placeholder: "\u041F\u043E\u0438\u0441\u043A \u043F\u043E \u0445\u0443\u0434\u043E\u0436\u043D\u0438\u043A\u0443, \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E, \u0437\u0430\u043C\u0435\u0442\u043A\u0430\u043C...",
+      value: search,
+      onChange: (e) => setSearch(e.target.value)
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: styles.filters }, /* @__PURE__ */ React.createElement("select", { style: styles.select, value: filterArtist, onChange: (e) => setFilterArtist(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u0412\u0441\u0435 \u0445\u0443\u0434\u043E\u0436\u043D\u0438\u043A\u0438"), artists.map((a) => /* @__PURE__ */ React.createElement("option", { key: a }, a))), /* @__PURE__ */ React.createElement("select", { style: styles.select, value: filterLocation, onChange: (e) => setFilterLocation(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u0412\u0441\u0435 \u043C\u0435\u0441\u0442\u0430"), locations.map((l) => /* @__PURE__ */ React.createElement("option", { key: l }, l))), /* @__PURE__ */ React.createElement("select", { style: styles.select, value: sortBy, onChange: (e) => setSortBy(e.target.value) }, SORT_OPTIONS.map((o) => /* @__PURE__ */ React.createElement("option", { key: o.value, value: o.value }, o.label))), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.select, cursor: "pointer" },
+      onClick: () => setSortDir((d) => d === "asc" ? "desc" : "asc"),
+      title: sortDir === "asc" ? "\u041F\u043E \u0432\u043E\u0437\u0440\u0430\u0441\u0442\u0430\u043D\u0438\u044E" : "\u041F\u043E \u0443\u0431\u044B\u0432\u0430\u043D\u0438\u044E"
+    },
+    sortDir === "asc" ? "\u2191" : "\u2193"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.select, ...favOnly ? styles.favToggleActive : {}, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 },
+      onClick: () => setFavOnly((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("span", null, favOnly ? "\u2665" : "\u2661"),
+    " \u041B\u044E\u0431\u0438\u043C\u044B\u0435"
+  ))), filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.empty }, collection.length === 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, "\u041A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u044F \u043F\u0443\u0441\u0442\u0430.", /* @__PURE__ */ React.createElement("br", null), "\u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043F\u0435\u0440\u0432\u0443\u044E \u0440\u0430\u0431\u043E\u0442\u0443.") : "\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.") : /* @__PURE__ */ React.createElement("div", { style: styles.grid }, filtered.map((w) => /* @__PURE__ */ React.createElement("div", { key: w.id, style: styles.card, className: "card", onClick: () => openDetail(w) }, /* @__PURE__ */ React.createElement("div", { style: styles.cardImg }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.heart, ...w.favorite ? styles.heartActive : {} },
+      className: "heart",
+      onClick: (e) => toggleFav(w.id, e),
+      title: "\u0412 \u043B\u044E\u0431\u0438\u043C\u044B\u0435"
+    },
+    w.favorite ? "\u2665" : "\u2661"
+  ), w.image ? /* @__PURE__ */ React.createElement("img", { src: w.image, alt: w.title, style: styles.img }) : /* @__PURE__ */ React.createElement("div", { style: styles.noImg }, /* @__PURE__ */ React.createElement("span", { style: styles.noImgIcon }, "\u{1F5BC}"))), /* @__PURE__ */ React.createElement("div", { style: styles.cardBody }, /* @__PURE__ */ React.createElement("div", { style: styles.cardArtist }, w.artist || "\u2014"), /* @__PURE__ */ React.createElement("div", { style: styles.cardTitle }, w.title || "\u0411\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F"), /* @__PURE__ */ React.createElement("div", { style: styles.cardMeta }, w.year && /* @__PURE__ */ React.createElement("span", null, w.year), w.year && w.location && /* @__PURE__ */ React.createElement("span", { style: styles.dot }, "\xB7"), w.location && /* @__PURE__ */ React.createElement("span", null, w.location))))))), view === "detail" && selected && (() => {
+    const w = collection.find((x) => x.id === selected.id) || selected;
+    return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("button", { style: styles.back, onClick: () => setView("grid"), className: "back-btn" }, "\u2190 \u043D\u0430\u0437\u0430\u0434"), /* @__PURE__ */ React.createElement("div", { style: styles.detail }, /* @__PURE__ */ React.createElement("div", { style: styles.detailImg }, w.image ? /* @__PURE__ */ React.createElement("img", { src: w.image, alt: w.title, style: { ...styles.detailImgEl, cursor: "zoom-in" }, onClick: () => setLightbox(w.image) }) : /* @__PURE__ */ React.createElement("div", { style: { ...styles.noImg, height: 300, borderRadius: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 48 } }, "\u{1F5BC}"))), /* @__PURE__ */ React.createElement("div", { style: styles.detailInfo }, /* @__PURE__ */ React.createElement("div", { style: styles.detailArtist }, w.artist || "\u0425\u0443\u0434\u043E\u0436\u043D\u0438\u043A \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D"), /* @__PURE__ */ React.createElement("div", { style: styles.detailTitle }, w.title || "\u0411\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F", /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        style: { ...styles.detailHeart, ...w.favorite ? styles.heartActive : {} },
+        className: "heart",
+        onClick: () => toggleFav(w.id),
+        title: "\u0412 \u043B\u044E\u0431\u0438\u043C\u044B\u0435"
+      },
+      w.favorite ? "\u2665" : "\u2661"
+    )), /* @__PURE__ */ React.createElement("div", { style: styles.detailMeta }, w.year && /* @__PURE__ */ React.createElement("div", { style: styles.metaRow }, /* @__PURE__ */ React.createElement("span", { style: styles.metaLabel }, "\u0413\u043E\u0434"), /* @__PURE__ */ React.createElement("span", null, w.year)), w.medium && /* @__PURE__ */ React.createElement("div", { style: styles.metaRow }, /* @__PURE__ */ React.createElement("span", { style: styles.metaLabel }, "\u0422\u0435\u0445\u043D\u0438\u043A\u0430"), /* @__PURE__ */ React.createElement("span", null, w.medium)), w.location && /* @__PURE__ */ React.createElement("div", { style: styles.metaRow }, /* @__PURE__ */ React.createElement("span", { style: styles.metaLabel }, "\u041C\u0435\u0441\u0442\u043E \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F"), /* @__PURE__ */ React.createElement("span", null, w.location)), w.notes && /* @__PURE__ */ React.createElement("div", { style: styles.metaRow }, /* @__PURE__ */ React.createElement("span", { style: styles.metaLabel }, "\u0417\u0430\u043C\u0435\u0442\u043A\u0438"), /* @__PURE__ */ React.createElement("span", { style: styles.notes }, w.notes))), /* @__PURE__ */ React.createElement("div", { style: styles.detailActions }, /* @__PURE__ */ React.createElement("button", { style: styles.editBtn, className: "edit-btn", onClick: () => openEdit(w) }, "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C"), /* @__PURE__ */ React.createElement("button", { style: styles.delBtn, className: "del-btn", onClick: () => handleDelete(w.id) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))));
+  })(), view === "form" && /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("button", { style: styles.back, onClick: () => setView(editing ? "detail" : "grid"), className: "back-btn" }, "\u2190 \u043D\u0430\u0437\u0430\u0434"), /* @__PURE__ */ React.createElement("div", { style: styles.formWrap }, /* @__PURE__ */ React.createElement("h2", { style: styles.formTitle }, editing ? "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0440\u0430\u0431\u043E\u0442\u0443" : "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0440\u0430\u0431\u043E\u0442\u0443"), /* @__PURE__ */ React.createElement("div", { style: styles.uploadArea, onClick: () => fileRef.current.click(), className: "upload-area" }, form.image ? /* @__PURE__ */ React.createElement("img", { src: form.image, alt: "", style: { maxHeight: 220, maxWidth: "100%", borderRadius: 4 } }) : /* @__PURE__ */ React.createElement("div", { style: styles.uploadPlaceholder }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 32 } }, "\u{1F5BC}"), /* @__PURE__ */ React.createElement("span", { style: { marginTop: 8, fontSize: 13, color: "#888" } }, "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F")), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: handleImage })), Object.entries(FIELDS).map(([key, label]) => /* @__PURE__ */ React.createElement("div", { key, style: styles.field }, /* @__PURE__ */ React.createElement("label", { style: styles.label }, label), key === "notes" ? /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      style: { ...styles.input, height: 90, resize: "vertical" },
+      value: form[key],
+      onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })),
+      placeholder: label
+    }
+  ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      style: styles.input,
+      value: form[key],
+      onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })),
+      placeholder: label,
+      type: key === "year" ? "number" : "text",
+      list: key === "artist" ? "artist-list" : key === "location" ? "location-list" : void 0
+    }
+  ), key === "artist" && /* @__PURE__ */ React.createElement("datalist", { id: "artist-list" }, artists.map((a) => /* @__PURE__ */ React.createElement("option", { key: a, value: a }))), key === "location" && /* @__PURE__ */ React.createElement("datalist", { id: "location-list" }, locations.map((l) => /* @__PURE__ */ React.createElement("option", { key: l, value: l })))))), /* @__PURE__ */ React.createElement("div", { style: styles.formActions }, /* @__PURE__ */ React.createElement("button", { style: styles.saveBtn, className: "save-btn", onClick: handleSubmit }, editing ? "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C" : "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u043A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u044E")))), exportText !== null && /* @__PURE__ */ React.createElement("div", { style: styles.lightbox, onClick: () => setExportText(null) }, /* @__PURE__ */ React.createElement("div", { style: styles.exportModal, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.exportTitle }, "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u0438"), /* @__PURE__ */ React.createElement("div", { style: styles.exportHint }, "\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0441\u0440\u0435\u0434\u043E\u0439. \u0412\u044B\u0434\u0435\u043B\u0438\u0442\u0435 \u0442\u0435\u043A\u0441\u0442 \u0438 \u0441\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0435\u0433\u043E \u0432 \u0444\u0430\u0439\u043B \u0441 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435\u043C .json"), /* @__PURE__ */ React.createElement("textarea", { style: styles.exportArea, readOnly: true, value: exportText, onFocus: (e) => e.target.select() }), /* @__PURE__ */ React.createElement("div", { style: styles.exportActions }, /* @__PURE__ */ React.createElement("button", { style: styles.editBtn, className: "edit-btn", onClick: async () => {
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setSaveError("");
+    } catch {
+    }
+  } }, "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C"), /* @__PURE__ */ React.createElement("button", { style: styles.delBtn, className: "del-btn", onClick: () => setExportText(null) }, "\u0417\u0430\u043A\u0440\u044B\u0442\u044C")))), lightbox && /* @__PURE__ */ React.createElement("div", { style: styles.lightbox, onClick: () => setLightbox(null) }, /* @__PURE__ */ React.createElement("button", { style: styles.lightboxClose, onClick: () => setLightbox(null), className: "back-btn" }, "\u2715"), /* @__PURE__ */ React.createElement("img", { src: lightbox, alt: "", style: styles.lightboxImg, onClick: (e) => e.stopPropagation() })));
 }
-
 function plural(n, one, few, many) {
   const mod10 = n % 10, mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return `${n} ${one}`;
-  if ([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return `${n} ${few}`;
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return `${n} ${few}`;
   return `${n} ${many}`;
 }
-
 const styles = {
   root: { minHeight: "100vh", background: "#0e0d0b", color: "#e8e2d8", fontFamily: "'Mulish', 'Segoe UI', sans-serif" },
   header: { borderBottom: "1px solid #2a2720", padding: "20px 0", position: "sticky", top: 0, background: "#0e0d0b", zIndex: 10 },
@@ -556,9 +371,8 @@ const styles = {
   label: { display: "block", fontSize: 11, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 },
   input: { width: "100%", background: "#1a1915", border: "1px solid #2e2b24", color: "#e8e2d8", padding: "10px 12px", fontSize: 14, fontFamily: "'Mulish', 'Segoe UI', sans-serif", outline: "none", borderRadius: 2, boxSizing: "border-box" },
   formActions: { marginTop: 28 },
-  saveBtn: { background: "#c9a84c", color: "#0e0d0b", border: "none", padding: "12px 28px", fontSize: 14, cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif", letterSpacing: "0.1em", width: "100%" },
+  saveBtn: { background: "#c9a84c", color: "#0e0d0b", border: "none", padding: "12px 28px", fontSize: 14, cursor: "pointer", fontFamily: "'Mulish', 'Segoe UI', sans-serif", letterSpacing: "0.1em", width: "100%" }
 };
-
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600&display=swap');
   .card:hover { border-color: #c9a84c !important; }
@@ -579,7 +393,7 @@ const css = `
 
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+root.render(React.createElement(App));
 </script>
 <script>
   if ("serviceWorker" in navigator) {
